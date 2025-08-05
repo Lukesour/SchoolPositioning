@@ -13,7 +13,7 @@ class AnalysisService:
         self.similarity_matcher = SimilarityMatcher()
         self.gemini_service = GeminiService()
         self.mock_gemini_service = MockGeminiService()
-        self.use_mock = True  # 默认使用模拟服务以避免API配额问题
+        self.use_mock = False  # 使用真实的Gemini API服务
     
     def generate_analysis_report(self, user_background: UserBackground) -> Optional[AnalysisReport]:
         """Generate complete analysis report for user"""
