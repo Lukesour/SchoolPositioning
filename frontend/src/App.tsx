@@ -48,7 +48,7 @@ function App() {
   return (
     <ConfigProvider locale={zhCN}>
       <div className="App">
-        <Spin spinning={loading} tip="正在进行AI分析，请稍候...">
+        <Spin spinning={loading} tip="正在进行AI分析，请等待几分钟，不要退出界面">
           {currentStep === 'form' && (
             <UserForm onSubmit={handleFormSubmit} loading={loading} />
           )}

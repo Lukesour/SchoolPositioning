@@ -59,52 +59,174 @@ class MockGeminiService:
             return None
     
     def generate_school_recommendations(self, user_background: UserBackground, similar_cases: List[Dict]) -> Optional[SchoolRecommendations]:
-        """模拟选校建议"""
+        """模拟选校建议 - 扩大推荐范围和丰富项目多样性"""
         try:
             target_countries = user_background.target_countries
             target_majors = user_background.target_majors
+            user_gpa = user_background.gpa
+            user_university = user_background.undergraduate_university
             
-            # 根据目标国家和专业生成推荐
+            # 根据目标国家和专业生成更多推荐
             reach_schools = []
             target_schools = []
             safety_schools = []
             
             if "美国" in target_countries:
-                if "计算机科学" in target_majors:
-                    reach_schools.append(SchoolRecommendation(
-                        university="斯坦福大学",
-                        program="MS in Computer Science",
-                        reason="顶尖CS项目，适合有强背景的申请者冲刺"
-                    ))
-                    target_schools.append(SchoolRecommendation(
-                        university="卡内基梅隆大学",
-                        program="MS in Computer Science",
-                        reason="CS专业排名顶尖，与您的背景匹配度较高"
-                    ))
-                    safety_schools.append(SchoolRecommendation(
-                        university="东北大学",
-                        program="MS in Computer Science",
-                        reason="录取相对友好，可作为保底选择"
-                    ))
+                if "计算机科学" in target_majors or "数据科学" in target_majors or "人工智能" in target_majors:
+                    # 冲刺档次 - 更多顶尖项目
+                    reach_schools.extend([
+                        SchoolRecommendation(
+                            university="斯坦福大学",
+                            program="MS in Computer Science",
+                            reason=f"基于您{user_gpa} GPA和{user_university}的背景，该顶尖CS项目值得冲刺，相似案例显示有录取可能"
+                        ),
+                        SchoolRecommendation(
+                            university="麻省理工学院",
+                            program="MEng in Computer Science",
+                            reason=f"您的{user_university}背景在MIT有良好声誉，GPA {user_gpa}达到申请门槛"
+                        ),
+                        SchoolRecommendation(
+                            university="加州大学伯克利分校",
+                            program="MS in Computer Science",
+                            reason=f"公立名校CS项目，您的学术背景符合其录取偏好"
+                        ),
+                        SchoolRecommendation(
+                            university="卡内基梅隆大学",
+                            program="MS in Machine Learning",
+                            reason=f"ML专业全美顶尖，您的背景在相似案例中有成功先例"
+                        ),
+                        SchoolRecommendation(
+                            university="华盛顿大学",
+                            program="MS in Computer Science & Engineering",
+                            reason=f"CS排名前十，对{user_university}学生友好，值得冲刺"
+                        )
+                    ])
+                    
+                    # 匹配档次 - 更多合适项目
+                    target_schools.extend([
+                        SchoolRecommendation(
+                            university="卡内基梅隆大学",
+                            program="MS in Information Systems",
+                            reason=f"CMU的IS项目录取相对CS更友好，您的背景匹配度高"
+                        ),
+                        SchoolRecommendation(
+                            university="南加州大学",
+                            program="MS in Computer Science",
+                            reason=f"私立名校，对国际学生友好，您的GPA {user_gpa}符合录取标准"
+                        ),
+                        SchoolRecommendation(
+                            university="纽约大学",
+                            program="MS in Computer Science",
+                            reason=f"地理位置优越，就业机会多，与您的背景匹配"
+                        ),
+                        SchoolRecommendation(
+                            university="加州大学圣地亚哥分校",
+                            program="MS in Computer Science",
+                            reason=f"公立名校，CS实力强劲，录取相对友好"
+                        ),
+                        SchoolRecommendation(
+                            university="德州大学奥斯汀分校",
+                            program="MS in Computer Science",
+                            reason=f"CS排名前十五，对{user_university}背景学生录取友好"
+                        ),
+                        SchoolRecommendation(
+                            university="伊利诺伊大学香槟分校",
+                            program="MS in Computer Science",
+                            reason=f"公立CS强校，相似背景案例录取率较高"
+                        )
+                    ])
+                    
+                    # 保底档次 - 更多稳妥选择
+                    safety_schools.extend([
+                        SchoolRecommendation(
+                            university="东北大学",
+                            program="MS in Computer Science",
+                            reason=f"录取相对友好，Co-op项目有利就业，适合保底"
+                        ),
+                        SchoolRecommendation(
+                            university="波士顿大学",
+                            program="MS in Computer Science",
+                            reason=f"私立名校，地理位置佳，您的背景录取概率高"
+                        ),
+                        SchoolRecommendation(
+                            university="加州大学欧文分校",
+                            program="MS in Computer Science",
+                            reason=f"加州公立名校，CS项目质量高，录取相对稳妥"
+                        ),
+                        SchoolRecommendation(
+                            university="罗格斯大学",
+                            program="MS in Computer Science",
+                            reason=f"公立研究型大学，CS项目实力不错，录取友好"
+                        ),
+                        SchoolRecommendation(
+                            university="亚利桑那州立大学",
+                            program="MS in Computer Science",
+                            reason=f"CS项目排名上升，对国际学生友好，可作保底"
+                        )
+                    ])
             
             if "英国" in target_countries:
-                reach_schools.append(SchoolRecommendation(
-                    university="剑桥大学",
-                    program="MPhil in Advanced Computer Science",
-                    reason="世界顶尖大学，值得冲刺"
-                ))
-                target_schools.append(SchoolRecommendation(
-                    university="帝国理工学院",
-                    program="MSc Computing",
-                    reason="理工科强校，与您的背景匹配"
-                ))
-                safety_schools.append(SchoolRecommendation(
-                    university="曼彻斯特大学",
-                    program="MSc Computer Science",
-                    reason="综合实力强，录取相对稳妥"
-                ))
+                # 英国项目推荐
+                reach_schools.extend([
+                    SchoolRecommendation(
+                        university="剑桥大学",
+                        program="MPhil in Advanced Computer Science",
+                        reason=f"世界顶尖大学，您的{user_university}背景有竞争力"
+                    ),
+                    SchoolRecommendation(
+                        university="牛津大学",
+                        program="MSc in Computer Science",
+                        reason=f"顶尖名校，您的学术背景符合申请要求"
+                    )
+                ])
+                
+                target_schools.extend([
+                    SchoolRecommendation(
+                        university="帝国理工学院",
+                        program="MSc Computing",
+                        reason=f"理工科强校，与您的背景高度匹配"
+                    ),
+                    SchoolRecommendation(
+                        university="伦敦大学学院",
+                        program="MSc Computer Science",
+                        reason=f"G5名校，CS项目质量高，录取相对友好"
+                    ),
+                    SchoolRecommendation(
+                        university="爱丁堡大学",
+                        program="MSc Computer Science",
+                        reason=f"苏格兰名校，CS排名英国前五，适合您的背景"
+                    )
+                ])
+                
+                safety_schools.extend([
+                    SchoolRecommendation(
+                        university="曼彻斯特大学",
+                        program="MSc Computer Science",
+                        reason=f"综合实力强，录取相对稳妥，就业前景好"
+                    ),
+                    SchoolRecommendation(
+                        university="布里斯托大学",
+                        program="MSc Computer Science",
+                        reason=f"英国名校，CS项目质量高，录取友好"
+                    )
+                ])
             
-            case_insights = f"根据与您背景相似的{len(similar_cases)}个成功案例分析，来自{user_background.undergraduate_university}的学生主要被录取到英美地区的知名院校。建议您在保持学术成绩的同时，重点提升标准化考试成绩和实践经历。"
+            # 如果目标包含其他国家，也添加相应推荐
+            if "加拿大" in target_countries:
+                target_schools.extend([
+                    SchoolRecommendation(
+                        university="多伦多大学",
+                        program="MSc in Computer Science",
+                        reason=f"加拿大顶尖大学，CS实力强劲，适合您的背景"
+                    ),
+                    SchoolRecommendation(
+                        university="滑铁卢大学",
+                        program="MMath in Computer Science",
+                        reason=f"CS和Co-op项目闻名，就业前景优秀"
+                    )
+                ])
+            
+            case_insights = f"根据与您背景相似的{len(similar_cases)}个成功案例分析，来自{user_university}、GPA {user_gpa}的学生主要被录取到英美地区的知名院校。这些案例显示，您的背景在申请{', '.join(target_majors)}相关项目时具有竞争优势。建议您在保持学术成绩的同时，重点提升标准化考试成绩和实践经历，同时可以考虑申请多个相关项目以增加录取机会。"
             
             return SchoolRecommendations(
                 reach=reach_schools,
@@ -125,12 +247,23 @@ class MockGeminiService:
                 experience="双方在实践经历方面都有一定积累，可以相互借鉴经验"
             )
             
+            # 模拟语言考试类型和主要经历
+            language_test_type = case_data.get('language_test_type', 'TOEFL')
+            if not language_test_type:
+                language_test_type = 'TOEFL' if case_data.get('language_total_score', 0) > 100 else 'IELTS'
+            
+            key_experiences = case_data.get('experience_text', '')
+            if not key_experiences:
+                key_experiences = "参与机器学习项目研究，在知名互联网公司实习，发表学术论文"
+            
             return CaseAnalysis(
                 case_id=case_data.get('id', 0),
                 admitted_university=case_data.get('admitted_university', ''),
                 admitted_program=case_data.get('admitted_program', ''),
                 gpa=str(case_data.get('gpa_4_scale', 0)),
                 language_score=str(case_data.get('language_total_score', 0)),
+                language_test_type=language_test_type,
+                key_experiences=key_experiences,
                 undergraduate_info=f"{case_data.get('undergraduate_university', '')} {case_data.get('undergraduate_major', '')}",
                 comparison=comparison,
                 success_factors="该案例成功的关键在于扎实的学术基础和丰富的实践经历",

@@ -103,6 +103,8 @@ export interface CaseAnalysis {
   admitted_program: string;
   gpa: string;
   language_score: string;
+  language_test_type?: string; // 语言考试类型 (TOEFL/IELTS)
+  key_experiences?: string; // 主要经历摘要
   undergraduate_info: string;
   comparison: CaseComparison;
   success_factors: string;

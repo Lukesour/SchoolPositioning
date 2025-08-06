@@ -212,9 +212,23 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({ report, onBack }) => {
                 <Text strong>基本信息：</Text>
                 <br />
                 <Text>GPA: {caseItem.gpa} | 语言: {caseItem.language_score}</Text>
+                {caseItem.language_test_type && (
+                  <>
+                    <br />
+                    <Text>语言考试类型: <Tag color="blue">{caseItem.language_test_type}</Tag></Text>
+                  </>
+                )}
                 <br />
                 <Text type="secondary">{caseItem.undergraduate_info}</Text>
               </div>
+
+              {caseItem.key_experiences && (
+                <div>
+                  <Text strong>主要经历：</Text>
+                  <br />
+                  <Text type="secondary">{caseItem.key_experiences}</Text>
+                </div>
+              )}
 
               <Collapse size="small">
                 <Panel header="详细对比分析" key="1">

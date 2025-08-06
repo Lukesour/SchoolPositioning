@@ -343,6 +343,9 @@ class SimilarityMatcher:
                 return 1.0
             else:
                 return 0.0
+        elif scale == "5.0":
+            # Convert 5.0-point scale to 4.0 scale
+            return min(gpa * 4.0 / 5.0, 4.0)
         else:
             return min(gpa, 4.0)
     

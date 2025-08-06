@@ -59,9 +59,9 @@ class AnalysisService:
                 )
                 future_to_task[future_schools] = "schools"
                 
-                # Task 3: Case analyses (for top 5 cases to reduce API calls)
+                # Task 3: Case analyses (for top 10 cases to provide more reference)
                 case_futures = []
-                for i, case in enumerate(similar_cases[:5]):
+                for i, case in enumerate(similar_cases[:10]):
                     case_data = case.get('case_data', {})
                     future_case = executor.submit(
                         service.analyze_single_case,
@@ -105,7 +105,7 @@ class AnalysisService:
             
             # Collect case analyses
             case_analyses = []
-            for i in range(5):
+            for i in range(10):
                 case_analysis = results.get(f"case_{i}")
                 if case_analysis:
                     case_analyses.append(case_analysis)

@@ -1,7 +1,7 @@
 import google.generativeai as genai
 import json
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from config.settings import settings
 from models.schemas import UserBackground, CompetitivenessAnalysis, SchoolRecommendations, CaseAnalysis, BackgroundImprovement
 
@@ -133,7 +133,13 @@ class GeminiService:
             "gre_score": user_background.gre_total
         }
         
-        prompt = f"""你是一位熟悉全球名校招生偏好的AI选校助手。基于用户背景和一系列相似背景的成功案例，为用户生成一个包含'冲刺(Reach)', '匹配(Target)', '保底(Safety)'三个档次的选校列表。每个推荐的院校项目，都必须附上针对该用户的、高度个性化的推荐理由。最后，总结这些案例的规律，给出一个'案例透视'。
+        prompt = f"""你是一位熟悉全球名校招生偏好的AI选校助手。基于用户背景和一系列相似背景的成功案例，为用户生成一个包含'冲刺(Reach)', '匹配(Target)', '保底(Safety)'三个档次的选校列表。
+
+核心要求：
+1. 尽可能多地返回与用户背景和目标相关的学校与项目，不要局限于少量固定的学校
+2. 允许并鼓励为同一个学校推荐多个相关的硕士或博士项目
+3. 确保每个推荐理由都是高度个性化的，能紧密结合用户的具体背景（如GPA、院校、经历）和相似案例进行分析
+4. 每个档次至少推荐5-8个项目，总数应该在15-25个项目之间
 
 用户资料：
 ```json
@@ -145,19 +151,19 @@ class GeminiService:
 {json.dumps(cases_data, ensure_ascii=False, indent=2)}
 ```
 
-请输出JSON格式：
+请输出JSON格式，每个档次包含更多项目：
 {{
   "reach": [
-    {{"university": "院校名", "program": "项目名", "reason": "推荐理由..."}},
-    {{"university": "院校名", "program": "项目名", "reason": "推荐理由..."}}
+    {{"university": "院校名", "program": "项目名", "reason": "基于用户GPA X.X、来自XX大学XX专业的背景，结合相似案例分析的详细推荐理由..."}},
+    // 至少5-8个冲刺项目
   ],
   "target": [
-    {{"university": "院校名", "program": "项目名", "reason": "推荐理由..."}},
-    {{"university": "院校名", "program": "项目名", "reason": "推荐理由..."}}
+    {{"university": "院校名", "program": "项目名", "reason": "基于用户具体背景和相似案例的详细推荐理由..."}},
+    // 至少5-8个匹配项目
   ],
   "safety": [
-    {{"university": "院校名", "program": "项目名", "reason": "推荐理由..."}},
-    {{"university": "院校名", "program": "项目名", "reason": "推荐理由..."}}
+    {{"university": "院校名", "program": "项目名", "reason": "基于用户具体背景和相似案例的详细推荐理由..."}},
+    // 至少5-8个保底项目
   ],
   "case_insights": "与你背景相似的同学主要录取到了...这些案例显示..."
 }}"""
@@ -221,8 +227,10 @@ class GeminiService:
 {json.dumps(case_info, ensure_ascii=False, indent=2)}
 ```
 
-请输出JSON格式：
+请输出JSON格式，必须包含以下字段：
 {{
+  "language_test_type": "从案例数据中提取语言考试类型，如TOEFL或IELTS，如果没有则为null",
+  "key_experiences": "对案例中的科研、实习等经历进行总结，形成一段摘要文字，例如：xx公司xx岗位实习，参与xx深度学习项目等",
   "comparison": {{
     "gpa": "用户GPA为X，案例为Y，[分析]",
     "university": "用户本科为X，案例为Y，[分析]",
@@ -248,6 +256,8 @@ class GeminiService:
                 admitted_program=case_data.get('admitted_program', ''),
                 gpa=str(case_data.get('gpa_4_scale', 0)),
                 language_score=str(case_data.get('language_total_score', 0)),
+                language_test_type=result_json.get("language_test_type"),
+                key_experiences=result_json.get("key_experiences"),
                 undergraduate_info=f"{case_data.get('undergraduate_university', '')} {case_data.get('undergraduate_major', '')}",
                 comparison={
                     "gpa": comparison_data.get("gpa", ""),

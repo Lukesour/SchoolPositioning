@@ -171,6 +171,7 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
                 >
                   <Select placeholder="请选择制式">
                     <Option value="4.0">4.0制</Option>
+                    <Option value="5.0">5.0制</Option>
                     <Option value="100">100分制</Option>
                   </Select>
                 </Form.Item>
@@ -289,7 +290,7 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
             <Row gutter={16}>
               <Col xs={24} sm={12}>
                 <Form.Item
-                  label="目标国家/地区"
+                  label="目标国家/地区 (可多选)"
                   name="target_countries"
                   rules={[{ required: true, message: '请选择目标国家/地区' }]}
                 >
@@ -302,7 +303,7 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item
-                  label="目标专业方向"
+                  label="目标专业方向 (可多选)"
                   name="target_majors"
                   rules={[{ required: true, message: '请选择目标专业方向' }]}
                 >

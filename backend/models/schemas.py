@@ -146,6 +146,8 @@ class CaseAnalysis(BaseModel):
     admitted_program: str
     gpa: str
     language_score: str
+    language_test_type: Optional[str] = None  # "TOEFL" or "IELTS"
+    key_experiences: Optional[str] = None  # 主要经历摘要
     undergraduate_info: str
     comparison: CaseComparison
     success_factors: str
