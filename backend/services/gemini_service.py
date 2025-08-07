@@ -12,19 +12,77 @@ class GeminiService:
         # 使用提供的API密钥
         api_key = settings.GEMINI_API_KEY or "AIzaSyCoFTfqOUr9K8Lg4v-mSR_Ou63YqQyv-r0"
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')  # 使用更稳定的模型
+        
+        # 尝试使用gemma-3-27b-it模型，如果不可用则回退到其他模型
+        available_models = [
+            'gemma-3-27b-it',     # 用户指定的模型，无配额限制
+            'gemma-3-12b-it',     # 备选模型1
+            'gemma-3-4b-it',      # 备选模型2
+            'gemini-1.5-flash',   # 备选模型3
+            'gemini-1.5-pro',     # 备选模型4
+        ]
+        
+        self.model = None
+        for model_name in available_models:
+            try:
+                self.model = genai.GenerativeModel(model_name)
+                # 测试模型是否可用
+                test_response = self.model.generate_content("测试")
+                if test_response and test_response.text:
+                    logger.info(f"✅ Successfully initialized {model_name} model")
+                    break
+            except Exception as e:
+                logger.warning(f"Failed to initialize {model_name} model: {e}")
+                continue
+        
+        if not self.model:
+            logger.error("❌ All Gemini models failed to initialize")
+            raise Exception("No available Gemini models")
     
     def _call_gemini_api(self, prompt: str, max_retries: int = 3) -> Optional[str]:
-        """Call Gemini API with retry logic"""
+        """Call Gemini API with improved retry logic"""
+        if not self.model:
+            logger.error("No available Gemini model")
+            return None
+            
         for attempt in range(max_retries):
             try:
-                response = self.model.generate_content(prompt)
-                return response.text
+                # 增加超时设置和更好的错误处理
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        top_p=0.8,
+                        top_k=40,
+                        max_output_tokens=8192,
+                    )
+                )
+                
+                if response and response.text:
+                    logger.info(f"✅ API call successful on attempt {attempt + 1}")
+                    return response.text
+                else:
+                    logger.warning(f"Empty response from API on attempt {attempt + 1}")
+                    
             except Exception as e:
+                error_msg = str(e).lower()
                 logger.warning(f"Gemini API call attempt {attempt + 1} failed: {str(e)}")
-                if attempt == max_retries - 1:
-                    logger.error(f"All Gemini API attempts failed: {str(e)}")
+                
+                # 配额错误直接返回，不重试
+                if "quota" in error_msg or "rate limit" in error_msg or "429" in error_msg:
+                    logger.error(f"API quota exceeded: {str(e)}")
                     return None
+                elif "network" in error_msg or "timeout" in error_msg:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Network error after {max_retries} attempts")
+                        return None
+                    import time
+                    time.sleep(1)
+                else:
+                    # 其他错误直接返回，不重试
+                    logger.error(f"Non-retryable error: {str(e)}")
+                    return None
+                    
         return None
     
     def _extract_json_from_response(self, response_text: str) -> Optional[Dict]:
@@ -88,11 +146,12 @@ class GeminiService:
 
         response_text = self._call_gemini_api(prompt)
         if not response_text:
-            return None
+            # 如果API调用失败，抛出异常以便被上层捕获
+            raise Exception("Gemini API call failed")
         
         result_json = self._extract_json_from_response(response_text)
         if not result_json:
-            return None
+            raise Exception("Failed to parse JSON response from Gemini API")
         
         try:
             return CompetitivenessAnalysis(
@@ -102,7 +161,7 @@ class GeminiService:
             )
         except Exception as e:
             logger.error(f"Error creating CompetitivenessAnalysis: {str(e)}")
-            return None
+            raise Exception(f"Failed to create CompetitivenessAnalysis: {str(e)}")
     
     def generate_school_recommendations(self, user_background: UserBackground, 
                                       similar_cases: List[Dict]) -> Optional[SchoolRecommendations]:
@@ -172,11 +231,11 @@ class GeminiService:
 
         response_text = self._call_gemini_api(prompt)
         if not response_text:
-            return None
+            raise Exception("Gemini API call failed")
         
         result_json = self._extract_json_from_response(response_text)
         if not result_json:
-            return None
+            raise Exception("Failed to parse JSON response from Gemini API")
         
         try:
             return SchoolRecommendations(
@@ -187,7 +246,7 @@ class GeminiService:
             )
         except Exception as e:
             logger.error(f"Error creating SchoolRecommendations: {str(e)}")
-            return None
+            raise Exception(f"Failed to create SchoolRecommendations: {str(e)}")
     
     def analyze_single_case(self, user_background: UserBackground, 
                            case_data: Dict) -> Optional[CaseAnalysis]:

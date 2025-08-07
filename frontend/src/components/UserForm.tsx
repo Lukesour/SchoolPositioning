@@ -61,7 +61,6 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
   const [majors, setMajors] = useState<string[]>(FALLBACK_MAJORS);
   const [majorsByCategory, setMajorsByCategory] = useState<Record<string, string[]>>({});
   const [dataLoading, setDataLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   // 加载院校和专业数据
   useEffect(() => {
@@ -94,14 +93,13 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
 
   const handleSubmit = (values: any) => {
     try {
-      // 处理目标专业方向数据
-      let target_majors: string[] = [];
-      if (values.target_major_category && values.target_major_specific) {
-        // 如果选择了具体专业，使用具体专业
-        target_majors = [values.target_major_specific];
-      } else if (values.target_major_category) {
-        // 如果只选择了大类，使用大类
-        target_majors = [values.target_major_category];
+      // 处理目标专业方向数据 - 现在支持多选
+      const target_majors: string[] = values.target_majors || [];
+      
+      // 验证是否选择了专业
+      if (target_majors.length === 0) {
+        message.error('请选择至少一个目标专业方向');
+        return;
       }
       
       // 处理表单数据
@@ -351,49 +349,25 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
               </Col>
               <Col xs={24} sm={12}>
                 <Form.Item
-                  label="目标专业方向"
+                  label="目标专业方向 (可多选)"
                   name="target_majors"
                   rules={[{ required: true, message: '请选择目标专业方向' }]}
                 >
-                  <Row gutter={8}>
-                    <Col span={12}>
-                      <Form.Item
-                        name="target_major_category"
-                        rules={[{ required: true, message: '请选择专业大类' }]}
-                        noStyle
-                      >
-                        <Select
-                          placeholder="选择专业大类"
-                          onChange={(value) => {
-                            // 当一级选择改变时，清空二级选择
-                            setSelectedCategory(value);
-                            form.setFieldsValue({ target_major_specific: undefined });
-                          }}
-                        >
-                          {Object.keys(majorsByCategory).map(category => (
-                            <Option key={category} value={category}>{category}</Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        name="target_major_specific"
-                        rules={[{ required: true, message: '请选择具体专业' }]}
-                        noStyle
-                      >
-                        <Select
-                          placeholder="选择具体专业"
-                          disabled={!selectedCategory}
-                        >
-                          {selectedCategory && 
-                           majorsByCategory[selectedCategory]?.map(major => (
-                            <Option key={major} value={major}>{major}</Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                  </Row>
+                  <Select
+                    mode="multiple"
+                    placeholder="请选择目标专业方向"
+                    showSearch
+                    filterOption={(inputValue, option) =>
+                      (option?.label as string)?.toLowerCase().indexOf(inputValue.toLowerCase()) !== -1
+                    }
+                    options={Object.entries(majorsByCategory).flatMap(([category, majors]) =>
+                      majors.map(major => ({
+                        label: `${category} - ${major}`,
+                        value: major,
+                        category: category
+                      }))
+                    )}
+                  />
                 </Form.Item>
               </Col>
             </Row>
