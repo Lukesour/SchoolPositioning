@@ -51,72 +51,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def generate_mock_analysis_report(user_background: UserBackground) -> AnalysisReport:
-    """生成模拟分析报告"""
-    return AnalysisReport(
-        competitiveness={
-            "strengths": f"基于您的背景，您在{user_background.undergraduate_major}领域有较强的学术基础。",
-            "weaknesses": "建议加强语言能力和科研经历。",
-            "summary": "整体竞争力良好，有较大提升空间。"
-        },
-        school_recommendations={
-            "reach": [
-                {
-                    "university": "Stanford University",
-                    "program": "Computer Science",
-                    "reason": "顶尖院校，适合优秀学生申请"
-                }
-            ],
-            "target": [
-                {
-                    "university": "University of California, Berkeley",
-                    "program": "Data Science",
-                    "reason": "匹配您的背景，录取概率较高"
-                }
-            ],
-            "safety": [
-                {
-                    "university": "University of Southern California",
-                    "program": "Computer Science",
-                    "reason": "保底选择，录取概率很高"
-                }
-            ],
-            "case_insights": "基于相似案例分析，建议重点准备语言考试和科研经历。"
-        },
-        similar_cases=[
-            {
-                "case_id": 1,
-                "admitted_university": "Stanford University",
-                "admitted_program": "Computer Science",
-                "gpa": "3.8",
-                "language_score": "7.5" if user_background.language_test_type == "IELTS" else "100",
-                "language_test_type": user_background.language_test_type or "TOEFL",
-                "undergraduate_info": f"{user_background.undergraduate_university} - {user_background.undergraduate_major}",
-                "comparison": {
-                    "gpa": "GPA相似，学术背景匹配",
-                    "university": "院校背景相当",
-                    "experience": "科研经历需要加强"
-                },
-                "success_factors": "优秀的GPA和语言成绩是关键",
-                "takeaways": "建议参加更多科研项目和实习"
-            }
-        ],
-        background_improvement={
-            "action_plan": [
-                {
-                    "timeframe": "3-6个月",
-                    "action": "提高语言成绩",
-                    "goal": "达到目标院校要求"
-                },
-                {
-                    "timeframe": "6-12个月",
-                    "action": "参与科研项目",
-                    "goal": "增强学术背景"
-                }
-            ],
-            "strategy_summary": "系统性的背景提升计划将显著提高申请成功率。"
-        }
-    )
+
 
 @app.get("/")
 async def root():
@@ -130,9 +65,9 @@ async def health_check():
         # Basic health check without loading data
         return {
             "status": "healthy",
-            "database": "configured" if analysis_service else "mock_mode",
+            "database": "configured" if analysis_service else "not_configured",
             "cases_loaded": "lazy_loading",
-            "gemini_api": "configured" if settings.GEMINI_API_KEY else "not_configured"
+            "llm_api": "configured" if settings.SILICONFLOW_API_KEY else "not_configured"
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -162,28 +97,32 @@ async def analyze_user_background(user_background: UserBackground):
                 detail="目标国家和专业信息是必填项"
             )
         
-        # Try to use real analysis service, fallback to mock
-        if analysis_service:
-            try:
-                report = analysis_service.generate_analysis_report(user_background)
-                if report:
-                    logger.info("Analysis completed successfully using real service")
-                    return report
-            except Exception as e:
-                logger.warning(f"Real analysis service failed, using mock: {e}")
-        
-        # Generate mock analysis report
-        logger.info("Using mock analysis service")
-        report = generate_mock_analysis_report(user_background)
-        
-        if not report:
+        # Check if analysis service is available
+        if not analysis_service:
+            logger.error("Analysis service is not available")
             raise HTTPException(
-                status_code=500,
-                detail="分析报告生成失败，请稍后重试"
+                status_code=503,
+                detail="非常抱歉，大模型无法连接，请联系客服"
             )
         
-        logger.info("Mock analysis completed successfully")
-        return report
+        # Try to use real analysis service
+        try:
+            report = analysis_service.generate_analysis_report(user_background)
+            if report:
+                logger.info("Analysis completed successfully using real service")
+                return report
+            else:
+                logger.error("Analysis service returned empty report")
+                raise HTTPException(
+                    status_code=503,
+                    detail="非常抱歉，大模型无法连接，请联系客服"
+                )
+        except Exception as e:
+            logger.error(f"Analysis service failed: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="非常抱歉，大模型无法连接，请联系客服"
+            )
         
     except HTTPException:
         raise
@@ -198,21 +137,20 @@ async def analyze_user_background(user_background: UserBackground):
 async def get_case_details(case_id: int):
     """Get detailed information for a specific case"""
     try:
-        if analysis_service:
-            case_details = analysis_service.get_case_details([case_id])
-            if case_details:
-                return case_details[0]
+        if not analysis_service:
+            raise HTTPException(
+                status_code=503,
+                detail="非常抱歉，大模型无法连接，请联系客服"
+            )
         
-        # Return mock case details
-        return {
-            "case_id": case_id,
-            "admitted_university": "Stanford University",
-            "admitted_program": "Computer Science",
-            "gpa": "3.8",
-            "language_score": "7.5",
-            "language_test_type": "IELTS",
-            "undergraduate_info": "清华大学 - 计算机科学与技术"
-        }
+        case_details = analysis_service.get_case_details([case_id])
+        if case_details:
+            return case_details[0]
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="案例未找到"
+            )
         
     except Exception as e:
         logger.error(f"Error getting case details: {str(e)}")
@@ -225,8 +163,13 @@ async def get_case_details(case_id: int):
 async def refresh_similarity_data(background_tasks: BackgroundTasks):
     """Refresh similarity matching data"""
     try:
-        if analysis_service:
-            background_tasks.add_task(analysis_service.refresh_similarity_data)
+        if not analysis_service:
+            raise HTTPException(
+                status_code=503,
+                detail="非常抱歉，大模型无法连接，请联系客服"
+            )
+        
+        background_tasks.add_task(analysis_service.refresh_similarity_data)
         return {"message": "数据刷新任务已启动"}
         
     except Exception as e:
@@ -240,7 +183,13 @@ async def refresh_similarity_data(background_tasks: BackgroundTasks):
 async def get_system_stats():
     """Get system statistics"""
     try:
-        if analysis_service and analysis_service.similarity_matcher.cases_df is not None:
+        if not analysis_service:
+            raise HTTPException(
+                status_code=503,
+                detail="非常抱歉，大模型无法连接，请联系客服"
+            )
+        
+        if analysis_service.similarity_matcher.cases_df is not None:
             cases_df = analysis_service.similarity_matcher.cases_df
             
             if not cases_df.empty:
@@ -252,13 +201,10 @@ async def get_system_stats():
                 }
                 return stats
         
-        # Return mock stats
-        return {
-            "total_cases": 1000,
-            "countries": {"美国": 500, "英国": 300, "加拿大": 200},
-            "universities": {"Stanford": 50, "MIT": 45, "UC Berkeley": 40},
-            "majors": {"CS": 300, "EE": 200, "ME": 150}
-        }
+        raise HTTPException(
+            status_code=503,
+            detail="统计数据不可用"
+        )
         
     except Exception as e:
         logger.error(f"Error getting stats: {str(e)}")

@@ -1,4 +1,4 @@
-import google.generativeai as genai
+import requests
 import json
 import logging
 from typing import Dict, List, Optional
@@ -7,86 +7,83 @@ from models.schemas import UserBackground, CompetitivenessAnalysis, SchoolRecomm
 
 logger = logging.getLogger(__name__)
 
-class GeminiService:
+class LLMService:
     def __init__(self):
-        # 使用提供的API密钥
-        api_key = settings.GEMINI_API_KEY or "AIzaSyCoFTfqOUr9K8Lg4v-mSR_Ou63YqQyv-r0"
-        genai.configure(api_key=api_key)
+        """Initialize LLM Service with SiliconFlow configuration"""
+        self.api_key = settings.SILICONFLOW_API_KEY
+        self.models_pipeline = settings.SILICONFLOW_MODELS_PIPELINE
+        self.base_url = "https://api.siliconflow.cn/v1/chat/completions"
         
-        # 尝试使用gemma-3-27b-it模型，如果不可用则回退到其他模型
-        available_models = [
-            'gemma-3-27b-it',     # 用户指定的模型，无配额限制
-            'gemma-3-12b-it',     # 备选模型1
-            'gemma-3-4b-it',      # 备选模型2
-            'gemini-1.5-flash',   # 备选模型3
-            'gemini-1.5-pro',     # 备选模型4
-        ]
+        if not self.api_key:
+            raise Exception("SILICONFLOW_API_KEY is not configured")
         
-        self.model = None
-        for model_name in available_models:
-            try:
-                self.model = genai.GenerativeModel(model_name)
-                # 测试模型是否可用
-                test_response = self.model.generate_content("测试")
-                if test_response and test_response.text:
-                    logger.info(f"✅ Successfully initialized {model_name} model")
-                    break
-            except Exception as e:
-                logger.warning(f"Failed to initialize {model_name} model: {e}")
-                continue
+        if not self.models_pipeline:
+            raise Exception("SILICONFLOW_MODELS_PIPELINE is not configured")
         
-        if not self.model:
-            logger.error("❌ All Gemini models failed to initialize")
-            raise Exception("No available Gemini models")
+        logger.info(f"Initialized LLM Service with {len(self.models_pipeline)} models in pipeline")
+        logger.info(f"Models pipeline: {', '.join(self.models_pipeline)}")
     
-    def _call_gemini_api(self, prompt: str, max_retries: int = 3) -> Optional[str]:
-        """Call Gemini API with improved retry logic"""
-        if not self.model:
-            logger.error("No available Gemini model")
-            return None
+    def _call_siliconflow_api(self, prompt: str) -> Optional[str]:
+        """Call SiliconFlow API with sequential model fallback"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        for model_name in self.models_pipeline:
+            logger.info(f"Attempting to call model: {model_name}...")
             
-        for attempt in range(max_retries):
+            payload = {
+                "model": model_name,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.7
+            }
+            
             try:
-                # 增加超时设置和更好的错误处理
-                response = self.model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        top_p=0.8,
-                        top_k=40,
-                        max_output_tokens=8192,
-                    )
+                response = requests.post(
+                    self.base_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=60
                 )
                 
-                if response and response.text:
-                    logger.info(f"✅ API call successful on attempt {attempt + 1}")
-                    return response.text
+                # Check for successful response
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get("choices") and len(result["choices"]) > 0:
+                        content = result["choices"][0].get("message", {}).get("content", "")
+                        if content:
+                            logger.info(f"Successfully received response from model: {model_name}")
+                            return content
+                        else:
+                            logger.warning(f"Model {model_name} returned empty content")
                 else:
-                    logger.warning(f"Empty response from API on attempt {attempt + 1}")
+                    # Handle API errors
+                    error_msg = f"HTTP {response.status_code}"
+                    try:
+                        error_detail = response.json()
+                        error_msg += f": {error_detail}"
+                    except:
+                        error_msg += f": {response.text}"
                     
+                    logger.warning(f"Model {model_name} failed. Reason: {error_msg}. Trying next model...")
+                    
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Model {model_name} failed. Reason: {str(e)}. Trying next model...")
             except Exception as e:
-                error_msg = str(e).lower()
-                logger.warning(f"Gemini API call attempt {attempt + 1} failed: {str(e)}")
-                
-                # 配额错误直接返回，不重试
-                if "quota" in error_msg or "rate limit" in error_msg or "429" in error_msg:
-                    logger.error(f"API quota exceeded: {str(e)}")
-                    return None
-                elif "network" in error_msg or "timeout" in error_msg:
-                    if attempt == max_retries - 1:
-                        logger.error(f"Network error after {max_retries} attempts")
-                        return None
-                    import time
-                    time.sleep(1)
-                else:
-                    # 其他错误直接返回，不重试
-                    logger.error(f"Non-retryable error: {str(e)}")
-                    return None
-                    
+                logger.warning(f"Model {model_name} failed. Reason: {str(e)}. Trying next model...")
+        
+        # All models failed
+        logger.error("All configured LLM models failed. The service is unavailable.")
         return None
     
     def _extract_json_from_response(self, response_text: str) -> Optional[Dict]:
-        """Extract JSON from Gemini response"""
+        """Extract JSON from LLM response"""
         if not response_text:
             return None
         
@@ -102,12 +99,12 @@ class GeminiService:
                 # If no JSON found, try to parse the entire response
                 return json.loads(response_text)
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON from Gemini response: {str(e)}")
+            logger.error(f"Failed to parse JSON from LLM response: {str(e)}")
             logger.error(f"Response text: {response_text}")
             return None
     
     def analyze_competitiveness(self, user_background: UserBackground) -> Optional[CompetitivenessAnalysis]:
-        """Analyze user's competitiveness using Gemini API"""
+        """Analyze user's competitiveness using SiliconFlow API"""
         
         # Prepare user data for the prompt
         user_data = {
@@ -144,14 +141,14 @@ class GeminiService:
   "summary": "[一段总结性文字，综合评价用户的整体竞争力水平，并给出申请成功概率的大致判断]"
 }}"""
 
-        response_text = self._call_gemini_api(prompt)
+        response_text = self._call_siliconflow_api(prompt)
         if not response_text:
             # 如果API调用失败，抛出异常以便被上层捕获
-            raise Exception("Gemini API call failed")
+            raise Exception("LLM API call failed")
         
         result_json = self._extract_json_from_response(response_text)
         if not result_json:
-            raise Exception("Failed to parse JSON response from Gemini API")
+            raise Exception("Failed to parse JSON response from LLM API")
         
         try:
             return CompetitivenessAnalysis(
@@ -165,7 +162,7 @@ class GeminiService:
     
     def generate_school_recommendations(self, user_background: UserBackground, 
                                       similar_cases: List[Dict]) -> Optional[SchoolRecommendations]:
-        """Generate school recommendations using Gemini API"""
+        """Generate school recommendations using SiliconFlow API"""
         
         # Prepare similar cases data
         cases_data = []
@@ -229,13 +226,13 @@ class GeminiService:
   "case_insights": "与你背景相似的同学主要录取到了...这些案例显示..."
 }}"""
 
-        response_text = self._call_gemini_api(prompt)
+        response_text = self._call_siliconflow_api(prompt)
         if not response_text:
-            raise Exception("Gemini API call failed")
+            raise Exception("LLM API call failed")
         
         result_json = self._extract_json_from_response(response_text)
         if not result_json:
-            raise Exception("Failed to parse JSON response from Gemini API")
+            raise Exception("Failed to parse JSON response from LLM API")
         
         try:
             return SchoolRecommendations(
@@ -250,7 +247,7 @@ class GeminiService:
     
     def analyze_single_case(self, user_background: UserBackground, 
                            case_data: Dict) -> Optional[CaseAnalysis]:
-        """Analyze a single similar case using Gemini API"""
+        """Analyze a single similar case using SiliconFlow API"""
         
         user_data = {
             "gpa": user_background.gpa,
@@ -301,7 +298,7 @@ class GeminiService:
   "takeaways": "用户可以从中学习到..."
 }}"""
 
-        response_text = self._call_gemini_api(prompt)
+        response_text = self._call_siliconflow_api(prompt)
         if not response_text:
             return None
         
@@ -334,7 +331,7 @@ class GeminiService:
     
     def generate_background_improvement(self, user_background: UserBackground, 
                                       weaknesses: str) -> Optional[BackgroundImprovement]:
-        """Generate background improvement suggestions using Gemini API"""
+        """Generate background improvement suggestions using SiliconFlow API"""
         
         user_data = {
             "gpa": user_background.gpa,
@@ -373,7 +370,7 @@ class GeminiService:
   "strategy_summary": "总体申请策略建议..."
 }}"""
 
-        response_text = self._call_gemini_api(prompt)
+        response_text = self._call_siliconflow_api(prompt)
         if not response_text:
             return None
         
@@ -389,3 +386,6 @@ class GeminiService:
         except Exception as e:
             logger.error(f"Error creating BackgroundImprovement: {str(e)}")
             return None
+
+# 为了保持向后兼容性，创建一个别名
+GeminiService = LLMService

@@ -58,8 +58,8 @@ def test_gemini_service():
     logger.info("Testing Gemini service...")
     
     try:
-        from services.gemini_service import GeminiService
-        gemini = GeminiService()
+        from services.llm_service import LLMService
+        llm_service = LLMService()
         
         # Create test user background
         user_background = UserBackground(
@@ -75,7 +75,7 @@ def test_gemini_service():
         
         # Test competitiveness analysis
         logger.info("Testing competitiveness analysis...")
-        competitiveness = gemini.analyze_competitiveness(user_background)
+        competitiveness = llm_service.analyze_competitiveness(user_background)
         
         if competitiveness:
             logger.info("Competitiveness analysis successful")

@@ -13,8 +13,9 @@ class Settings:
     DB_NAME_SOURCE = os.getenv("DB_NAME_SOURCE", "compass_cases_details")
     DB_NAME_TARGET = os.getenv("DB_NAME_TARGET", "compass_analytics_preprocessed")
     
-    # Gemini API Configuration
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCoFTfqOUr9K8Lg4v-mSR_Ou63YqQyv-r0")
+    # SiliconFlow API Configuration
+    SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY")
+    SILICONFLOW_MODELS_PIPELINE = os.getenv("SILICONFLOW_MODELS_PIPELINE", "").split(",") if os.getenv("SILICONFLOW_MODELS_PIPELINE") else []
     
     # Application Configuration
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
