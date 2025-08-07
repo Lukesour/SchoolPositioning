@@ -211,7 +211,11 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({ report, onBack }) => {
               <div>
                 <Text strong>基本信息：</Text>
                 <br />
-                <Text>GPA: {caseItem.gpa} | 语言: {caseItem.language_score}</Text>
+                <Text>GPA: {caseItem.gpa} | 语言: {
+                  caseItem.language_test_type === 'IELTS' 
+                    ? (Number(caseItem.language_score) / 10).toFixed(1)
+                    : caseItem.language_score
+                }</Text>
                 {caseItem.language_test_type && (
                   <>
                     <br />
@@ -263,7 +267,7 @@ const AnalysisReport: React.FC<AnalysisReportProps> = ({ report, onBack }) => {
     </Row>
   );
 
-  const renderBackgroundImprovement = () => {
+    const renderBackgroundImprovement = () => {
     if (!report.background_improvement) {
       return <Alert message="背景提升建议暂时无法生成" type="info" />;
     }

@@ -7,6 +7,8 @@ from models.schemas import SourceCaseDetail, ProcessedCase, Base
 from config.settings import settings
 import logging
 from typing import Dict, Optional, Tuple, List
+import PyPDF2
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +28,10 @@ class ETLProcessor:
         
         # Major category mapping
         self.major_categories = self._load_major_categories()
+        
+        # Load expanded data from files
+        self.expanded_universities = self._load_universities_from_excel()
+        self.expanded_majors = self._load_majors_from_pdf()
     
     def _load_university_tiers(self) -> Dict[str, str]:
         """Load university tier mapping"""
@@ -98,6 +104,94 @@ class ETLProcessor:
             # Add more categories as needed
         }
         return categories
+    
+    def _load_universities_from_excel(self) -> List[Dict[str, str]]:
+        """Load universities from Excel file"""
+        try:
+            # Get the path to the Excel file
+            excel_path = os.path.join(os.path.dirname(__file__), '../../data/院校列表.xls')
+            
+            if not os.path.exists(excel_path):
+                logger.warning(f"University Excel file not found at {excel_path}")
+                return []
+            
+            # Read Excel file, skip first 2 rows
+            df = pd.read_excel(excel_path, skiprows=2)
+            
+            # Clean data and filter undergraduate universities
+            df_clean = df.dropna(subset=['学校名称', '办学层次'])
+            undergraduate_unis = df_clean[df_clean['办学层次'] == '本科']
+            
+            universities = []
+            for _, row in undergraduate_unis.iterrows():
+                university = {
+                    'name': str(row['学校名称']).strip(),
+                    'location': str(row['所在地']).strip() if pd.notna(row['所在地']) else '',
+                    'authority': str(row['主管部门']).strip() if pd.notna(row['主管部门']) else '',
+                    'code': str(row['学校标识码']).strip() if pd.notna(row['学校标识码']) else ''
+                }
+                universities.append(university)
+            
+            logger.info(f"Loaded {len(universities)} undergraduate universities from Excel")
+            return universities
+            
+        except Exception as e:
+            logger.error(f"Error loading universities from Excel: {str(e)}")
+            return []
+    
+    def _load_majors_from_pdf(self) -> List[Dict[str, str]]:
+        """Load majors from PDF file"""
+        try:
+            # Get the path to the PDF file
+            pdf_path = os.path.join(os.path.dirname(__file__), '../../data/专业列表.pdf')
+            
+            if not os.path.exists(pdf_path):
+                logger.warning(f"Major PDF file not found at {pdf_path}")
+                return []
+            
+            majors = []
+            with open(pdf_path, 'rb') as file:
+                reader = PyPDF2.PdfReader(file)
+                text = ''
+                
+                # Extract text from all pages
+                for page in reader.pages:
+                    text += page.extract_text()
+                
+                # Parse major information using regex
+                # Pattern to match major codes and names like "020101  经济学"
+                major_pattern = r'(\d{6}[TK]?)\s+([^\n\r]+?)(?=\s*\(|$|\n|\r)'
+                matches = re.findall(major_pattern, text)
+                
+                # Pattern to match discipline categories like "01  学科门类：哲学"
+                category_pattern = r'(\d{2})\s+学科门类：([^\n\r]+)'
+                category_matches = re.findall(category_pattern, text)
+                
+                # Create category mapping
+                category_map = {}
+                for code, name in category_matches:
+                    category_map[code] = name.strip()
+                
+                for code, name in matches:
+                    # Extract discipline category from major code (first 2 digits)
+                    discipline_code = code[:2]
+                    discipline_name = category_map.get(discipline_code, '其他')
+                    
+                    major = {
+                        'code': code.strip(),
+                        'name': name.strip(),
+                        'discipline': discipline_name,
+                        'is_special': 'T' in code,  # Special major
+                        'is_controlled': 'K' in code  # Controlled major
+                    }
+                    majors.append(major)
+                
+            logger.info(f"Loaded {len(majors)} majors from PDF")
+            return majors
+            
+        except Exception as e:
+            logger.error(f"Error loading majors from PDF: {str(e)}")
+            return []
     
     def extract_gpa_info(self, gpa_str: str, background_text: str) -> Tuple[Optional[float], str, str]:
         """Extract and standardize GPA information"""
@@ -252,14 +346,26 @@ class ETLProcessor:
         # Clean university name
         cleaned_name = university_name.strip()
         
-        # Direct lookup
+        # Direct lookup in predefined tiers
         if cleaned_name in self.university_tiers:
             return self.university_tiers[cleaned_name]
         
-        # Fuzzy matching for partial names
+        # Fuzzy matching for partial names in predefined tiers
         for uni_name, tier in self.university_tiers.items():
             if uni_name in cleaned_name or cleaned_name in uni_name:
                 return tier
+        
+        # Check if university exists in expanded university list
+        for uni in self.expanded_universities:
+            if uni['name'] == cleaned_name or uni['name'] in cleaned_name or cleaned_name in uni['name']:
+                # Classify based on authority (主管部门)
+                authority = uni.get('authority', '')
+                if authority == '教育部':
+                    return "211"  # Most education ministry universities are at least 211
+                elif authority in ['工业和信息化部', '国防科技工业局']:
+                    return "211"
+                else:
+                    return "普通本科"
         
         # Default classification based on keywords
         if any(keyword in cleaned_name for keyword in ["大学", "学院", "University", "College"]):
@@ -274,13 +380,19 @@ class ETLProcessor:
         
         cleaned_name = major_name.strip()
         
+        # First check predefined categories
         if cleaned_name in self.major_categories:
             return self.major_categories[cleaned_name]
         
-        # Fuzzy matching
+        # Fuzzy matching in predefined categories
         for major, category in self.major_categories.items():
             if major in cleaned_name or cleaned_name in major:
                 return category
+        
+        # Check in expanded majors list
+        for major in self.expanded_majors:
+            if major['name'] == cleaned_name or major['name'] in cleaned_name or cleaned_name in major['name']:
+                return major['discipline']
         
         return "Other"
     
@@ -484,6 +596,50 @@ class ETLProcessor:
         # Close sessions
         self.source_session.close()
         self.target_session.close()
+    
+    def get_universities_list(self) -> List[str]:
+        """Get list of university names for frontend"""
+        university_names = []
+        
+        # Add predefined universities
+        for uni_name in self.university_tiers.keys():
+            university_names.append(uni_name)
+        
+        # Add universities from Excel file
+        for uni in self.expanded_universities:
+            if uni['name'] not in university_names:
+                university_names.append(uni['name'])
+        
+        return sorted(university_names)
+    
+    def get_majors_list(self) -> List[Dict[str, str]]:
+        """Get list of majors with categories for frontend"""
+        majors_list = []
+        
+        # Add predefined majors
+        for major_name, category in self.major_categories.items():
+            majors_list.append({
+                'name': major_name,
+                'category': category,
+                'code': '',
+                'discipline': category
+            })
+        
+        # Add majors from PDF file
+        for major in self.expanded_majors:
+            # Check if major already exists
+            existing = any(m['name'] == major['name'] for m in majors_list)
+            if not existing:
+                majors_list.append({
+                    'name': major['name'],
+                    'category': major['discipline'],
+                    'code': major['code'],
+                    'discipline': major['discipline']
+                })
+        
+        # Sort by discipline and then by name
+        majors_list.sort(key=lambda x: (x['discipline'], x['name']))
+        return majors_list
 
 if __name__ == "__main__":
     processor = ETLProcessor()

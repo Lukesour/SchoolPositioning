@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>前后端连接测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; margin: 5px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #results { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>留学选校系统 - 前后端连接测试</h1>
+    
+    <button onclick="testConnection()">测试后端连接</button>
+    <button onclick="testUniversities()">测试院校API</button>
+    <button onclick="testMajors()">测试专业API</button>
+    <button onclick="testAnalysis()">测试分析API</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        
+        function addResult(message, isSuccess = true) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            div.innerHTML = `${new Date().toLocaleTimeString()}: ${message}`;
+            results.appendChild(div);
+        }
+        
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const data = await response.json();
+                addResult(`✅ 后端连接成功: ${data.message}`, true);
+            } catch (error) {
+                addResult(`❌ 后端连接失败: ${error.message}`, false);
+            }
+        }
+        
+        async function testUniversities() {
+            try {
+                const response = await fetch(`${API_BASE}/api/universities`);
+                const data = await response.json();
+                addResult(`✅ 院校API成功: 获取到 ${data.universities.length} 所院校`, true);
+            } catch (error) {
+                addResult(`❌ 院校API失败: ${error.message}`, false);
+            }
+        }
+        
+        async function testMajors() {
+            try {
+                const response = await fetch(`${API_BASE}/api/majors`);
+                const data = await response.json();
+                addResult(`✅ 专业API成功: 获取到 ${data.majors.length} 个专业`, true);
+            } catch (error) {
+                addResult(`❌ 专业API失败: ${error.message}`, false);
+            }
+        }
+        
+        async function testAnalysis() {
+            try {
+                const testData = {
+                    undergraduate_university: "北京大学",
+                    undergraduate_major: "计算机科学",
+                    gpa: "3.5",
+                    target_countries: ["加拿大"],
+                    target_majors: ["计算机科学"]
+                };
+                
+                const response = await fetch(`${API_BASE}/api/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ 分析API成功: 生成了包含 ${data.similar_cases.length} 个相似案例的报告`, true);
+                    
+                    // 测试雅思成绩显示修复
+                    data.similar_cases.forEach((case, index) => {
+                        if (case.language_test_type === 'IELTS') {
+                            const displayScore = (case.language_score / 10).toFixed(1);
+                            addResult(`   案例${index + 1}: IELTS ${case.language_score} → 显示为 ${displayScore}`, true);
+                        } else {
+                            addResult(`   案例${index + 1}: ${case.language_test_type} ${case.language_score}`, true);
+                        }
+                    });
+                } else {
+                    addResult(`❌ 分析API失败: HTTP ${response.status}`, false);
+                }
+            } catch (error) {
+                addResult(`❌ 分析API失败: ${error.message}`, false);
+            }
+        }
+        
+        // 页面加载时自动测试连接
+        window.onload = function() {
+            addResult("开始测试前后端连接...", true);
+            testConnection();
+        };
+    </script>
+</body>
+</html>

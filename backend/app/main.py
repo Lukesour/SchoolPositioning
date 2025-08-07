@@ -5,6 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from models.schemas import UserBackground, AnalysisReport
 from services.analysis_service import AnalysisService
+from scripts.etl_processor import ETLProcessor
 from config.settings import settings
 
 # Configure logging
@@ -14,15 +15,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global analysis service instance
+# Global service instances
 analysis_service = None
+etl_processor = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global analysis_service
+    global analysis_service, etl_processor
     logger.info("Starting up application...")
     analysis_service = AnalysisService()
+    etl_processor = ETLProcessor()
     logger.info("Application startup completed")
     yield
     # Shutdown
@@ -174,6 +177,34 @@ async def get_system_stats():
         raise HTTPException(
             status_code=500,
             detail=f"获取统计信息失败: {str(e)}"
+        )
+
+@app.get("/api/universities")
+async def get_universities():
+    """Get list of all universities"""
+    try:
+        universities = etl_processor.get_universities_list()
+        return {"universities": universities}
+        
+    except Exception as e:
+        logger.error(f"Error getting universities: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取院校列表失败: {str(e)}"
+        )
+
+@app.get("/api/majors")
+async def get_majors():
+    """Get list of all majors with categories"""
+    try:
+        majors = etl_processor.get_majors_list()
+        return {"majors": majors}
+        
+    except Exception as e:
+        logger.error(f"Error getting majors: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取专业列表失败: {str(e)}"
         )
 
 if __name__ == "__main__":

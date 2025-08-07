@@ -160,6 +160,18 @@ export const apiService = {
     const response = await apiClient.post('/api/refresh-data');
     return response.data;
   },
+
+  // 获取院校列表
+  async getUniversities() {
+    const response = await apiClient.get('/api/universities');
+    return (response.data as any).universities;
+  },
+
+  // 获取专业列表
+  async getMajors() {
+    const response = await apiClient.get('/api/majors');
+    return (response.data as any).majors;
+  },
 };
 
 export default apiService;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Form,
   Input,
@@ -12,9 +12,11 @@ import {
   Divider,
   AutoComplete,
   message,
+  Spin,
 } from 'antd';
 import { PlusOutlined, MinusCircleOutlined, SendOutlined } from '@ant-design/icons';
 import { UserBackground } from '../services/api';
+import apiService from '../services/api';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -44,16 +46,47 @@ const COUNTRIES = [
   '美国', '英国', '加拿大', '澳大利亚', '新加坡', '香港', '德国', '法国', '日本', '韩国',
 ];
 
-const TARGET_MAJORS = [
-  '计算机科学', '数据科学', '人工智能', '软件工程', '电子工程', '机械工程',
-  '金融', '商业分析', '管理学', '经济学',
-];
+// TARGET_MAJORS 已移至动态获取，不再使用硬编码
 
 const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
   const [form] = Form.useForm();
   const [hasLanguageScore, setHasLanguageScore] = useState(false);
   const [hasGRE, setHasGRE] = useState(false);
   const [hasGMAT, setHasGMAT] = useState(false);
+  
+  // 动态数据状态
+  const [universities, setUniversities] = useState<string[]>(UNIVERSITIES);
+  const [majors, setMajors] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // 加载数据
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setDataLoading(true);
+        const [universitiesData, majorsData] = await Promise.all([
+          apiService.getUniversities(),
+          apiService.getMajors()
+        ]);
+        
+        setUniversities(universitiesData);
+        setMajors(majorsData);
+        
+        console.log('Loaded universities:', universitiesData.length);
+        console.log('Loaded majors:', majorsData.length);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        message.warning('数据加载失败，使用默认数据');
+        // 使用默认数据
+        const defaultMajors = MAJORS.map(name => ({ name, discipline: '其他' }));
+        setMajors(defaultMajors);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleSubmit = (values: any) => {
     try {
@@ -106,6 +139,12 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px' }}>
       <Card title="留学定位与选校规划 - 个人信息填写">
+        {dataLoading && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <Spin size="large" />
+            <div style={{ marginTop: '10px' }}>正在加载院校和专业数据...</div>
+          </div>
+        )}
         <Form
           form={form}
           layout="vertical"
@@ -122,11 +161,12 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
                   rules={[{ required: true, message: '请输入本科院校' }]}
                 >
                   <AutoComplete
-                    options={UNIVERSITIES.map(uni => ({ value: uni }))}
+                    options={universities.map(uni => ({ value: uni }))}
                     placeholder="请输入或选择本科院校"
                     filterOption={(inputValue, option) =>
                       option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
                     }
+                    disabled={dataLoading}
                   />
                 </Form.Item>
               </Col>
@@ -137,11 +177,12 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
                   rules={[{ required: true, message: '请输入本科专业' }]}
                 >
                   <AutoComplete
-                    options={MAJORS.map(major => ({ value: major }))}
+                    options={majors.map(major => ({ value: major.name, label: `${major.name} (${major.discipline})` }))}
                     placeholder="请输入或选择本科专业"
                     filterOption={(inputValue, option) =>
                       option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
                     }
+                    disabled={dataLoading}
                   />
                 </Form.Item>
               </Col>
@@ -310,7 +351,12 @@ const UserForm: React.FC<UserFormProps> = ({ onSubmit, loading = false }) => {
                   <Select
                     mode="multiple"
                     placeholder="请选择目标专业方向"
-                    options={TARGET_MAJORS.map(major => ({ label: major, value: major }))}
+                    options={majors.map(major => ({ label: `${major.name} (${major.discipline})`, value: major.name }))}
+                    disabled={dataLoading}
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
                   />
                 </Form.Item>
               </Col>
