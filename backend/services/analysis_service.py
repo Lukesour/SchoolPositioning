@@ -14,6 +14,31 @@ class AnalysisService:
         self.gemini_service = GeminiService()
         self.mock_gemini_service = MockGeminiService()
         self.use_mock = False  # 使用真实的Gemini API服务
+        
+        # 检查Gemini API是否可用
+        try:
+            # 测试API连接
+            test_result = self.gemini_service.analyze_competitiveness(
+                UserBackground(
+                    undergraduate_university="测试",
+                    undergraduate_major="测试",
+                    gpa=3.5,
+                    gpa_scale="4.0",
+                    graduation_year=2024,
+                    target_countries=["美国"],
+                    target_majors=["计算机科学"],
+                    target_degree_type="Master"
+                )
+            )
+            if test_result:
+                logger.info("✅ Gemini API is working correctly")
+                self.use_mock = False
+            else:
+                logger.warning("⚠️ Gemini API test failed, switching to mock service")
+                self.use_mock = True
+        except Exception as e:
+            logger.warning(f"⚠️ Gemini API initialization failed: {e}, switching to mock service")
+            self.use_mock = True
     
     def generate_analysis_report(self, user_background: UserBackground) -> Optional[AnalysisReport]:
         """Generate complete analysis report for user"""

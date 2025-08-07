@@ -9,8 +9,10 @@ logger = logging.getLogger(__name__)
 
 class GeminiService:
     def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemma-3-27b-it')
+        # 使用提供的API密钥
+        api_key = settings.GEMINI_API_KEY or "AIzaSyCoFTfqOUr9K8Lg4v-mSR_Ou63YqQyv-r0"
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')  # 使用更稳定的模型
     
     def _call_gemini_api(self, prompt: str, max_retries: int = 3) -> Optional[str]:
         """Call Gemini API with retry logic"""

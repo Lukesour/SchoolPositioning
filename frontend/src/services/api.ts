@@ -143,6 +143,18 @@ export const apiService = {
     return response.data;
   },
 
+  // 获取院校列表
+  async getUniversities() {
+    const response = await apiClient.get('/api/universities');
+    return response.data;
+  },
+
+  // 获取专业列表
+  async getMajors() {
+    const response = await apiClient.get('/api/majors');
+    return response.data;
+  },
+
   // 分析用户背景
   async analyzeUserBackground(userBackground: UserBackground): Promise<AnalysisReport> {
     const response = await apiClient.post('/api/analyze', userBackground);
@@ -159,18 +171,6 @@ export const apiService = {
   async refreshData() {
     const response = await apiClient.post('/api/refresh-data');
     return response.data;
-  },
-
-  // 获取院校列表
-  async getUniversities() {
-    const response = await apiClient.get('/api/universities');
-    return (response.data as any).universities;
-  },
-
-  // 获取专业列表
-  async getMajors() {
-    const response = await apiClient.get('/api/majors');
-    return (response.data as any).majors;
   },
 };
 

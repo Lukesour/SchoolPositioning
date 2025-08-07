@@ -14,7 +14,7 @@ class Settings:
     DB_NAME_TARGET = os.getenv("DB_NAME_TARGET", "compass_analytics_preprocessed")
     
     # Gemini API Configuration
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCoFTfqOUr9K8Lg4v-mSR_Ou63YqQyv-r0")
     
     # Application Configuration
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
